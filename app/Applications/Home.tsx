@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         color: '#d68b09',
         textDecorationLine: 'underline',
-        textDecorationColor: "#d68b09",
+        textDecorationColor: "#d68b09"
     },
     addButton: {
         backgroundColor: '#007BFF',
