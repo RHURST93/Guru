@@ -8,14 +8,11 @@ import {
     Button,
     Modal,
     TouchableOpacity,
-    Alert,
-    ImageBackground
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GestureHandlerRootView } from 'react-native-gesture-handler'; 
-import { Swipeable } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { relative } from 'path';
 
 interface Item {
     id: string;
@@ -23,11 +20,14 @@ interface Item {
     dateApplied: string;
     recruiter: string;
     contact: string;
+    status: 'pending' | 'selected' | 'notSelected';
 }
 
 const Home = () => {
     const router = useRouter();
     const [data, setData] = useState<Item[]>([]);
+    const [filteredData, setFilteredData] = useState<Item[]>([]);
+    const [filter, setFilter] = useState<string>('all'); // Filter state
     const [newItemTitle, setNewItemTitle] = useState<string>('');
     const [dateApplied, setDateApplied] = useState<string>('');
     const [recruiter, setRecruiter] = useState<string>('');
@@ -58,7 +58,17 @@ const Home = () => {
             }
         };
         saveData();
+        applyFilter(filter);
     }, [data]);
+
+    const applyFilter = (status: string) => {
+        setFilter(status);
+        if (status === 'all') {
+            setFilteredData(data);
+        } else {
+            setFilteredData(data.filter((item) => item.status === status));
+        }
+    };
 
     const addItem = () => {
         if (
@@ -73,6 +83,7 @@ const Home = () => {
                 dateApplied,
                 recruiter,
                 contact,
+                status: 'pending', // Default status
             };
             setData((prevData) => [...prevData, newItem]);
             setNewItemTitle('');
@@ -86,18 +97,44 @@ const Home = () => {
     };
 
     const removeItem = (id: string) => {
-        setData((prevData) => prevData.filter(item => item.id !== id));
+        setData((prevData) => prevData.filter((item) => item.id !== id));
+    };
+
+    const toggleStatus = (id: string) => {
+        setData((prevData) =>
+            prevData.map((item) =>
+                item.id === id
+                    ? {
+                          ...item,
+                          status:
+                              item.status === 'selected'
+                                  ? 'pending'
+                                  : item.status === 'pending'
+                                  ? 'notSelected'
+                                  : 'selected',
+                      }
+                    : item
+            )
+        );
     };
 
     const renderItem = ({ item }: { item: Item }) => {
         const renderRightActions = () => (
             <View style={styles.deleteButton}>
-                <Button
-                    title="Delete"
-                    color="red"
-                    onPress={() => removeItem(item.id)}
-                />
-            </View>
+    <TouchableOpacity
+        style={{
+            borderRadius: 5,
+            backgroundColor: 'red',
+            padding: 10,
+            justifyContent: 'center',
+            alignItems: 'center',
+        }}
+        onPress={() => removeItem(item.id)}
+    >
+        <Text style={{ color: 'white', fontWeight: 'bold' }}>Delete</Text>
+    </TouchableOpacity>
+</View>
+
         );
 
         return (
@@ -107,6 +144,17 @@ const Home = () => {
                     <Text>Date Applied: {item.dateApplied}</Text>
                     <Text>Recruiter: {item.recruiter}</Text>
                     <Text>Contact: {item.contact}</Text>
+                    <TouchableOpacity
+                        style={[
+                            styles.statusButton,
+                            styles[item.status],
+                        ]}
+                        onPress={() => toggleStatus(item.id)}
+                    >
+                        <Text style={styles.statusButtonText}>
+                            {item.status}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </Swipeable>
         );
@@ -114,153 +162,104 @@ const Home = () => {
 
     return (
         <GestureHandlerRootView style={styles.container}>
-            
-            
-                <Text style={styles.text}>Applications</Text>
+            <Text style={styles.text}>Applications</Text>
 
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => setModalVisible(true)}
-                >
-                    <Text style={styles.addButtonText}>+ Add Application</Text>
-                </TouchableOpacity>
+            <View style={styles.filterContainer}>
+                {['all', 'pending', 'notSelected', 'selected'].map((status) => (
+                    <TouchableOpacity
+                        key={status}
+                        style={[
+                            styles.filterButton,
+                            filter === status && styles.activeFilter,
+                        ]}
+                        onPress={() => applyFilter(status)}
+                    >
+                        <Text style={styles.filterText}>{status}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
 
-                <FlatList
-                    data={data}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id}
-                />
+            <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => setModalVisible(true)}
+            >
+                <Text style={styles.addButtonText}>+ Add Application</Text>
+            </TouchableOpacity>
 
-                <Modal
-                    visible={modalVisible}
-                    animationType="slide"
-                    transparent={true}
-                    onRequestClose={() => setModalVisible(false)}
-                >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Add New Application</Text>
+            <FlatList
+                data={filteredData}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.id}
+            />
 
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Item Title"
-                                value={newItemTitle}
-                                onChangeText={setNewItemTitle}
-                            />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Date Applied (YYYY-MM-DD)"
-                                value={dateApplied}
-                                onChangeText={setDateApplied}
-                            />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Recruiter Name"
-                                value={recruiter}
-                                onChangeText={setRecruiter}
-                            />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Contact Info"
-                                value={contact}
-                                onChangeText={setContact}
-                            />
-                            <Button title="Add Item" onPress={addItem} />
-                            <Button
-                                title="Cancel"
-                                color="red"
-                                onPress={() => setModalVisible(false)}
-                            />
-                        </View>
+            <Modal
+                visible={modalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Item Title"
+                            value={newItemTitle}
+                            onChangeText={setNewItemTitle}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Date Applied (YYYY-MM-DD)"
+                            value={dateApplied}
+                            onChangeText={setDateApplied}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Recruiter Name"
+                            value={recruiter}
+                            onChangeText={setRecruiter}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Contact Info"
+                            value={contact}
+                            onChangeText={setContact}
+                        />
+                        <Button title="Add Item" onPress={addItem} />
+                        <Button
+                            title="Cancel"
+                            color="red"
+                            onPress={() => setModalVisible(false)}
+                        />
                     </View>
-                </Modal>
-
-                <Button
+                </View>
+            </Modal>
+            <Button
                     title="Go to Resumes"
                     onPress={() => router.push('/Resume')}
                 />
-            
         </GestureHandlerRootView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        padding: 10,
-    },
-    text: {
-        textAlign: 'center',
-        fontSize: 20,
-        marginBottom: 10,
-        color: '#d68b09',
-        textDecorationLine: 'underline',
-        textDecorationColor: "#d68b09"
-    },
-    addButton: {
-        backgroundColor: '#007BFF',
-        padding: 10,
-        marginBottom: 10,
-        alignItems: 'center',
-        borderRadius: 5,
-    },
-    addButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-    },
-    item: {
-        backgroundColor: '#ffffff',
-        padding: 15,
-        marginVertical: 5,
-        marginHorizontal: 10,
-        borderRadius: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    title: {
-        fontSize: 16,
-        color: '#333',
-    },
-    deleteButton: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#f8d7da',
-        padding: 20,
-        borderRadius: 10,
-    },
-    modalContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    modalContent: {
-        width: '80%',
-        backgroundColor: '#1f1c1c',
-        padding: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    modalTitle: {
-        fontSize: 18,
-        marginBottom: 10,
-        color: 'white'
-    },
-    input: {
-        height: 40,
-        borderColor: '#ccc',
-        borderWidth: 1,
-        marginBottom: 10,
-        paddingHorizontal: 10,
-        borderRadius: 5,
-        width: '100%',
-        color: 'white',
-        backgroundColor: 'white'
-    },
+    container: { flex: 1, padding: 10, width: "100%" },
+    text: { textAlign: 'center', fontSize: 20, marginBottom: 10 },
+    filterContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 },
+    filterButton: { padding: 10, backgroundColor: '#ddd', borderRadius: 5, margin: 5 },
+    activeFilter: { backgroundColor: '#007BFF' },
+    filterText: { color: '#000' },
+    addButton: { backgroundColor: '#007BFF', padding: 10, marginBottom: 10, alignItems: 'center', borderRadius: 5 },
+    addButtonText: { color: '#FFF' },
+    item: { backgroundColor: '#FFF', padding: 15, marginVertical: 5, borderRadius: 5 },
+    statusButton: { marginTop: 10, padding: 10, borderRadius: 5, alignItems: 'center' },
+    pending: { backgroundColor: '#f9c74f' },
+    selected: { backgroundColor: '#28a745' },
+    notSelected: { backgroundColor: '#dc3545' },
+    statusButtonText: { color: '#FFF' },
+    modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+    modalContent: { width: '80%', padding: 20, backgroundColor: '#FFF', borderRadius: 5 },
+    input: { height: 40, borderColor: '#ccc', borderWidth: 1, marginBottom: 10, paddingHorizontal: 10 },
+    deleteButton: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8d7da', paddingHorizontal: 50, height:155, marginTop: 5, borderRadius: 5 },
 });
 
 export default Home;
